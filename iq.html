@@ -1,0 +1,310 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <title>Fun IQ Test</title>
+
+    <style>
+        body {
+            font-family: "Segoe UI", sans-serif;
+            background: linear-gradient(135deg, #ffecd2, #fcb69f);
+            padding: 20px;
+            color: #333;
+        }
+
+        h1,
+        h2 {
+            text-align: center;
+            color: #d9480f;
+        }
+
+        #content {
+            max-width: 620px;
+            margin: auto;
+            background: white;
+            padding: 25px;
+            border-radius: 12px;
+            box-shadow: 0 10px 25px rgba(0, 0, 0, 0.15);
+            text-align: center;
+        }
+
+        input {
+            font-size: 1.2em;
+            padding: 10px;
+            width: 70%;
+            margin-top: 10px;
+        }
+
+        button {
+            margin: 12px;
+            padding: 10px 22px;
+            font-size: 1em;
+            border: none;
+            border-radius: 6px;
+            cursor: pointer;
+            color: white;
+        }
+
+        .submit {
+            background: #06d6a0;
+        }
+
+        .yes {
+            background: #118ab2;
+        }
+
+        .no {
+            background: #ef476f;
+        }
+
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            margin-top: 20px;
+        }
+
+        th,
+        td {
+            border: 1px solid #999;
+            padding: 6px;
+        }
+
+        th {
+            background: #ffb347;
+            color: white;
+        }
+
+        .correct {
+            background: #c7f7d4;
+        }
+
+        .wrong {
+            background: #f7c7c7;
+        }
+
+        .small {
+            font-size: 0.8em;
+            color: #555;
+        }
+    </style>
+</head>
+
+<body>
+
+    <h1>Fun IQ Test</h1>
+    <div id="content">
+        <button class="submit" onclick="start()">Start Test</button>
+    </div>
+
+    <script>
+        /* =======================
+           CONFIG
+        ======================= */
+        const BASE_WEIGHT = 0.7;
+        const SPEED_WEIGHT = 0.3;
+        const MEAN_SCORE = 2650;
+        const STD_DEV = 400;
+
+        /* =======================
+           HELPERS
+        ======================= */
+        const content = document.getElementById("content");
+
+        function rand(min, max) {
+            return Math.floor(Math.random() * (max - min + 1)) + min;
+        }
+
+        function render(html) {
+            content.innerHTML = html;
+        }
+
+        /* =======================
+           QUESTION GENERATORS
+        ======================= */
+        function generateMath() {
+            if (Math.random() < 0.5) {
+                const a = rand(5, 25);
+                const b = rand(5, 25);
+                return { q: `What is ${a} + ${b}?`, a: String(a + b) };
+            } else {
+                const a = rand(6, 15);
+                const b = rand(4, 12);
+                return { q: `What is ${a} × ${b}?`, a: String(a * b) };
+            }
+        }
+
+        function generateMemory() {
+            let s = "";
+            for (let i = 0; i < rand(5, 7); i++) s += rand(0, 9);
+            return s;
+        }
+
+        const logicPool = [
+            { q: "Is zero an even number?", a: "Yes" },
+            { q: "Is every prime number odd?", a: "No" },
+            { q: "Can a square have five sides?", a: "No" },
+            { q: "Is 2 the only even prime number?", a: "Yes" },
+            { q: "Can all rectangles be squares?", a: "No" }
+        ];
+
+        /* =======================
+           TEST DATA
+        ======================= */
+        let tests = [];
+        let results = [];
+        let current = 0;
+        let totalScore = 0;
+        let startTime = 0;
+
+        function buildTests() {
+            const m1 = generateMath();
+            const m2 = generateMath();
+            const mem = generateMemory();
+            const logic = logicPool[rand(0, logicPool.length - 1)];
+
+            return [
+                { type: "input", name: "Math", q: m1.q, a: m1.a, max: 1000, limit: 10 },
+                { type: "input", name: "Math", q: m2.q, a: m2.a, max: 1000, limit: 10 },
+                { type: "memory", name: "Memory", a: mem, max: 1200, limit: 12, show: 2500 },
+                { type: "yesno", name: "Logic", q: logic.q, a: logic.a, max: 800, limit: 5 }
+            ];
+        }
+
+        /* =======================
+           SCORING
+        ======================= */
+        function score(correct, time, max, limit) {
+            if (!correct) return 0;
+            const base = max * BASE_WEIGHT;
+            const speed = max * SPEED_WEIGHT * Math.max(0, 1 - time / limit);
+            return base + speed;
+        }
+
+        /* =======================
+           FLOW
+        ======================= */
+        function start() {
+            tests = buildTests();
+            results = [];
+            current = 0;
+            totalScore = 0;
+            next();
+        }
+
+        function next() {
+            if (current >= tests.length) return finish();
+            const t = tests[current];
+
+            if (t.type === "memory") {
+                render(`
+            <h2>Memory</h2>
+            <p>Remember this number:</p>
+            <h1>${t.a}</h1>
+        `);
+
+                setTimeout(() => {
+                    render(`
+                <h2>Memory</h2>
+                <p>Enter the number:</p>
+                <form id="form">
+                    <input id="answer" inputmode="numeric" autocomplete="off">
+                    <br>
+                    <button class="submit">Submit</button>
+                </form>
+            `);
+
+                    const input = document.getElementById("answer");
+                    const form = document.getElementById("form");
+                    input.focus();
+                    startTime = performance.now();
+
+                    form.onsubmit = e => {
+                        e.preventDefault();
+                        submitAnswer(input.value.trim());
+                    };
+                }, t.show);
+            }
+
+            else if (t.type === "yesno") {
+                render(`
+            <h2>Logic</h2>
+            <p>${t.q}</p>
+            <button class="yes" onclick="submitAnswer('Yes')">Yes</button>
+            <button class="no" onclick="submitAnswer('No')">No</button>
+        `);
+                startTime = performance.now();
+            }
+
+            else {
+                render(`
+            <h2>${t.name}</h2>
+            <p>${t.q}</p>
+            <form id="form">
+                <input id="answer" inputmode="numeric" autocomplete="off">
+                <br>
+                <button class="submit">Submit</button>
+            </form>
+        `);
+
+                const input = document.getElementById("answer");
+                const form = document.getElementById("form");
+                input.focus();
+                startTime = performance.now();
+
+                form.onsubmit = e => {
+                    e.preventDefault();
+                    submitAnswer(input.value.trim());
+                };
+            }
+        }
+
+        function submitAnswer(answer) {
+            const t = tests[current];
+            const time = (performance.now() - startTime) / 1000;
+            const correct = answer === t.a;
+            const pts = score(correct, time, t.max, t.limit);
+
+            results.push({ ...t, answer, time, pts });
+            totalScore += pts;
+            current++;
+            next();
+        }
+
+        /* =======================
+           RESULTS
+        ======================= */
+        function finish() {
+            const iq = Math.round(100 + ((totalScore - MEAN_SCORE) / STD_DEV) * 15);
+
+            render(`
+        <h2>Your Results</h2>
+        <table>
+            <tr>
+                <th>Test</th>
+                <th>Your Answer</th>
+                <th>Correct</th>
+                <th>Time</th>
+                <th>Points</th>
+            </tr>
+            ${results.map(r => `
+                <tr>
+                    <td>${r.name}</td>
+                    <td class="${r.answer === r.a ? 'correct' : 'wrong'}">${r.answer}</td>
+                    <td>${r.a}</td>
+                    <td>${r.time.toFixed(2)}s</td>
+                    <td>${Math.round(r.pts)}</td>
+                </tr>
+            `).join("")}
+        </table>
+
+        <p><strong>Total Points:</strong> ${Math.round(totalScore)}</p>
+        <h2>Estimated IQ: <span style="color:#06d6a0">${iq}</span></h2>
+        <button class="submit" onclick="start()">Play Again</button>
+    `);
+        }
+    </script>
+
+</body>
+
+</html>
